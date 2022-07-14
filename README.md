@@ -6,7 +6,7 @@ A flutter implementation of a sticky header list widget with lazy loading suppor
 [!["Buy Me A Coffee"](https://img.shields.io/badge/-buy_me_a%C2%A0coffee-gray?logo=buy-me-a-coffee)](https://www.buymeacoffee.com/incompetent)
 
 
-![Screenshot](https://raw.githubusercontent.com/incompetent-tester/lazy_sticky_headers/master/docs/sample.gif)
+![Screenshot](https://raw.githubusercontent.com/incompetent-tester/lazy_sticky_headers/master/doc/sample.gif)
 
 ## Features
 
