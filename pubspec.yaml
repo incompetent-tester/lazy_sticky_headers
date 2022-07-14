@@ -1,0 +1,29 @@
+name: lazy_sticky_headers
+description: A sticky header list with lazy loading support
+version: 0.0.1
+homepage:
+
+environment:
+  sdk: ">=2.17.5 <3.0.0"
+  flutter: ">=2.5.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.0.2
+  scrollable_positioned_list: ^0.3.2
+  visibility_detector: ^0.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.incompetent_tester.lazy_sticky_headers
+        pluginClass: LazyStickyHeadersPlugin
+      ios:
+        pluginClass: LazyStickyHeadersPlugin
