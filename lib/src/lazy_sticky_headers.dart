@@ -95,7 +95,9 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
           _curStickyHeader = (item as StickyHeader).previousHeader;
         }
 
-        _headerStreamCtrl.add(_curStickyHeader?.content);
+        if (!_headerStreamCtrl.isClosed) {
+          _headerStreamCtrl.add(_curStickyHeader?.content);
+        }
         break;
       }
     }

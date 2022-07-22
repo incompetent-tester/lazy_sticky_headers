@@ -1,6 +1,6 @@
 name: lazy_sticky_headers
 description: A sticky header list with lazy loading support and programmatic scroll positioning features
-version: 0.0.2
+version: 0.0.3
 homepage: https://github.com/incompetent-tester/lazy_sticky_headers
 
 environment:
