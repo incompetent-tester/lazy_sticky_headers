@@ -27,7 +27,10 @@ class _MyAppState extends State<MyApp> {
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    if (Platform.isLinux || Platform.isMacOS || Platform.isWindows || Platform.isFuchsia) {
+    if (Platform.isLinux ||
+        Platform.isMacOS ||
+        Platform.isWindows ||
+        Platform.isFuchsia) {
       throw Exception("Unsupported platforms");
     }
   }
@@ -54,7 +57,8 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Lazy Sticky Headers'),
         ),
         body: LazyStickyHeaders<String, String>(
-          scrollPhysics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          scrollPhysics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics()),
           scrollController: _itemScrollController,
 
           // Header

@@ -1,12 +1,5 @@
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
-class Tuple<X, Y> {
-  final X first;
-  final Y second;
-
-  Tuple({required this.first, required this.second});
-}
-
 typedef StickyItemScrollController = ItemScrollController;
 
 /* -------------------------------------------------------------------------- */
@@ -28,8 +21,8 @@ abstract class StickyItem<X> {
 }
 
 class StickyHeader<X> extends StickyItem<X> {
-  StickyHeader? nextHeader;
-  StickyHeader? previousHeader;
+  StickyHeader<X>? nextHeader;
+  StickyHeader<X>? previousHeader;
 
   @override
   StickyType get type => StickyType.header;

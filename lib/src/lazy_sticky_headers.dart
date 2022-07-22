@@ -1,9 +1,12 @@
 library lazy_sticky_headers;
 
+import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lazy_sticky_headers/src/data.dart';
+import 'package:lazy_sticky_headers/src/widget_header.dart';
+import 'package:lazy_sticky_headers/src/widget_sticky_header.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -39,7 +42,8 @@ class LazyStickyHeaders<X, Y> extends StatefulWidget {
     this.reverse = false,
     this.shrinkWrap = false,
   }) : super(key: key) {
-    assert(header.length == content.length, "header.length should be equal to content.length");
+    assert(header.length == content.length,
+        "header.length should be equal to content.length");
   }
 
   @override
@@ -47,15 +51,17 @@ class LazyStickyHeaders<X, Y> extends StatefulWidget {
 }
 
 class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
+  final _headerStreamCtrl = StreamController<X?>.broadcast();
+
   final _itemPositionsListener = ItemPositionsListener.create();
+  final _sortedIdxSet = SplayTreeSet<int>((a, b) => a.compareTo(b));
 
   late List<StickyItem> _stickyItems;
-  late SplayTreeSet<int> _sortedIdxSet;
 
-  late final StickyItemScrollController _itemScrollController = widget.scrollController == null
-      ? //
-      StickyItemScrollController()
-      : widget.scrollController!;
+  late final StickyItemScrollController _itemScrollCtrl =
+      widget.scrollController == null
+          ? StickyItemScrollController() //
+          : widget.scrollController!;
 
   late final Future<void> _mappingFuture = _mapHeaderContent();
 
@@ -66,6 +72,12 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
   void initState() {
     super.initState();
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
+  }
+
+  @override
+  void dispose() {
+    _headerStreamCtrl.close();
+    super.dispose();
   }
 
   void _stickyHeaderTransition() {
@@ -83,20 +95,25 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
           _curStickyHeader = (item as StickyHeader).previousHeader;
         }
 
-        setState(() {});
+        _headerStreamCtrl.add(_curStickyHeader?.content);
         break;
       }
     }
   }
 
   Future<void> _mapHeaderContent() async {
-    var result = await _computeMapping(widget.header, widget.content);
-
-    _stickyItems = result.first;
-    _sortedIdxSet = result.second;
+    _stickyItems = await _computeMapping(widget.header, widget.content);
   }
 
   /* ---------------------------- Render Functions ---------------------------- */
+  Widget _buildLoader() {
+    return widget.builderLoader == null
+        ? const Center(
+            child: CircularProgressIndicator(),
+          )
+        : widget.builderLoader!.call();
+  }
+
   Widget _buildList() {
     return Stack(
       children: [
@@ -104,9 +121,9 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
           onNotification: (n) {
             _overscrollTop = n.metrics.outOfRange && n.metrics.pixels < 0;
 
-            if (_overscrollTop) {
+            if (_overscrollTop && _curStickyHeader != null) {
               _curStickyHeader = null;
-              setState(() {});
+              _headerStreamCtrl.add(null);
             }
             return false;
           },
@@ -119,7 +136,7 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
 
             //
             itemCount: _stickyItems.length,
-            itemScrollController: _itemScrollController,
+            itemScrollController: _itemScrollCtrl,
             itemPositionsListener: _itemPositionsListener,
             itemBuilder: (context, index) {
               var item = _stickyItems[index];
@@ -127,12 +144,14 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
               switch (item.type) {
                 case StickyType.content:
                   return VisibilityDetector(
-                      key: ValueKey(index),
+                      key: ValueKey('content_$index'),
                       child: widget.builderContent(item.content),
                       onVisibilityChanged: (info) {
-                        if (info.visibleFraction > 0.05) {
+                        if (info.visibleFraction > 0.05 &&
+                            !_sortedIdxSet.contains(index)) {
                           _sortedIdxSet.add(index);
-                        } else {
+                        } else if (info.visibleFraction <= 0.05 &&
+                            _sortedIdxSet.contains(index)) {
                           _sortedIdxSet.remove(index);
                         }
 
@@ -141,19 +160,22 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
 
                 case StickyType.header:
                   return VisibilityDetector(
-                    key: ValueKey(index),
-                    child: Opacity(
-                      opacity: item == _curStickyHeader ? 0.0 : 1.0,
-                      child: widget.builderHeader(item.content),
+                    key: ValueKey('header_$index'),
+                    child: WidgetHeader<X>(
+                      builder: widget.builderHeader,
+                      item: item.content,
+                      stream: _headerStreamCtrl.stream,
                     ),
                     onVisibilityChanged: (info) {
-                      if (info.visibleFraction > 0.05) {
+                      if (info.visibleFraction > 0.05 &&
+                          !_sortedIdxSet.contains(index)) {
                         _sortedIdxSet.add(index);
-                      } else {
+                        _stickyHeaderTransition();
+                      } else if (info.visibleFraction <= 0.05 &&
+                          _sortedIdxSet.contains(index)) {
                         _sortedIdxSet.remove(index);
+                        _stickyHeaderTransition();
                       }
-
-                      _stickyHeaderTransition();
                     },
                   );
               }
@@ -162,17 +184,12 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
         ),
 
         //
-        _curStickyHeader != null ? widget.builderHeader(_curStickyHeader!.content) : Container()
+        WidgetStickyHeader<X>(
+          stream: _headerStreamCtrl.stream,
+          builder: widget.builderHeader,
+        ),
       ],
     );
-  }
-
-  Widget _buildLoader() {
-    return widget.builderLoader == null
-        ? const Center(
-            child: CircularProgressIndicator(),
-          )
-        : widget.builderLoader!.call();
   }
 
   @override
@@ -193,7 +210,7 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
 /* -------------------------------------------------------------------------- */
 /*                              Compute / Isolate                             */
 /* -------------------------------------------------------------------------- */
-Future<Tuple<List<StickyItem>, SplayTreeSet<int>>> _computeMapping(List header, List content) async {
+Future<List<StickyItem>> _computeMapping(List header, List content) async {
   var param = {
     'header': header,
     'content': content,
@@ -202,12 +219,11 @@ Future<Tuple<List<StickyItem>, SplayTreeSet<int>>> _computeMapping(List header, 
   return await compute(_headerContentMapping, param);
 }
 
-Tuple<List<StickyItem>, SplayTreeSet<int>> _headerContentMapping(Map<String, dynamic> params) {
+List<StickyItem> _headerContentMapping(Map<String, dynamic> params) {
   List header = params['header'];
   List content = params['content'];
 
   final stickyItems = <StickyItem>[];
-  final sortedIdxSet = SplayTreeSet<int>((a, b) => a.compareTo(b));
 
   int i = 0;
   StickyHeader? previousHeader;
@@ -230,5 +246,5 @@ Tuple<List<StickyItem>, SplayTreeSet<int>> _headerContentMapping(Map<String, dyn
     i += 1;
   }
 
-  return Tuple(first: stickyItems, second: sortedIdxSet);
+  return stickyItems;
 }
