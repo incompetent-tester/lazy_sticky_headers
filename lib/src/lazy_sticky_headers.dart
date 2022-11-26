@@ -14,12 +14,12 @@ import 'package:visibility_detector/visibility_detector.dart';
 /*                                   Widget                                   */
 /* -------------------------------------------------------------------------- */
 class LazyStickyHeaders<X, Y> extends StatefulWidget {
-  final List<X> header;
-  final List<List<Y>> content;
+  final List<X>? header;
+  final List<List<Y>>? content;
   final Widget Function(X) builderHeader;
   final Widget Function(Y) builderContent;
+  final Widget loader;
 
-  final Widget Function()? builderLoader;
   final StickyItemScrollController? scrollController;
 
   final ScrollPhysics? scrollPhysics;
@@ -33,7 +33,7 @@ class LazyStickyHeaders<X, Y> extends StatefulWidget {
     required this.content,
     required this.builderHeader,
     required this.builderContent,
-    this.builderLoader,
+    required this.loader,
 
     // Related to ScrollList
     this.scrollController,
@@ -42,8 +42,9 @@ class LazyStickyHeaders<X, Y> extends StatefulWidget {
     this.reverse = false,
     this.shrinkWrap = false,
   }) : super(key: key) {
-    assert(header.length == content.length,
-        "header.length should be equal to content.length");
+    if (header != null && content != null) {
+      assert(header!.length == content!.length, "header.length should be equal to content.length");
+    }
   }
 
   @override
@@ -58,15 +59,16 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
 
   late List<StickyItem> _stickyItems;
 
-  late final StickyItemScrollController _itemScrollCtrl =
-      widget.scrollController == null
-          ? StickyItemScrollController() //
-          : widget.scrollController!;
+  late final _itemScrollCtrl = widget.scrollController == null //
+      ? StickyItemScrollController()
+      : widget.scrollController!;
 
   late final Future<void> _mappingFuture = _mapHeaderContent();
 
   bool _overscrollTop = false;
   StickyHeader? _curStickyHeader;
+
+  bool get _shouldMap => widget.header != null && widget.content != null;
 
   @override
   void initState() {
@@ -104,16 +106,12 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
   }
 
   Future<void> _mapHeaderContent() async {
-    _stickyItems = await _computeMapping(widget.header, widget.content);
+    _stickyItems = await _computeMapping(widget.header!, widget.content!);
   }
 
   /* ---------------------------- Render Functions ---------------------------- */
   Widget _buildLoader() {
-    return widget.builderLoader == null
-        ? const Center(
-            child: CircularProgressIndicator(),
-          )
-        : widget.builderLoader!.call();
+    return widget.loader;
   }
 
   Widget _buildList() {
@@ -149,11 +147,9 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
                       key: ValueKey('content_$index'),
                       child: widget.builderContent(item.content),
                       onVisibilityChanged: (info) {
-                        if (info.visibleFraction > 0.05 &&
-                            !_sortedIdxSet.contains(index)) {
+                        if (info.visibleFraction > 0.05 && !_sortedIdxSet.contains(index)) {
                           _sortedIdxSet.add(index);
-                        } else if (info.visibleFraction <= 0.05 &&
-                            _sortedIdxSet.contains(index)) {
+                        } else if (info.visibleFraction <= 0.05 && _sortedIdxSet.contains(index)) {
                           _sortedIdxSet.remove(index);
                         }
 
@@ -169,12 +165,10 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
                       stream: _headerStreamCtrl.stream,
                     ),
                     onVisibilityChanged: (info) {
-                      if (info.visibleFraction > 0.05 &&
-                          !_sortedIdxSet.contains(index)) {
+                      if (info.visibleFraction > 0.05 && !_sortedIdxSet.contains(index)) {
                         _sortedIdxSet.add(index);
                         _stickyHeaderTransition();
-                      } else if (info.visibleFraction <= 0.05 &&
-                          _sortedIdxSet.contains(index)) {
+                      } else if (info.visibleFraction <= 0.05 && _sortedIdxSet.contains(index)) {
                         _sortedIdxSet.remove(index);
                         _stickyHeaderTransition();
                       }
@@ -197,7 +191,7 @@ class _LazyStickyHeadersState<X, Y> extends State<LazyStickyHeaders<X, Y>> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      future: _mappingFuture,
+      future: _shouldMap ? _mappingFuture : null,
       builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
           return _buildList();

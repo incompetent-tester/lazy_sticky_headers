@@ -18,19 +18,38 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final _itemScrollController = StickyItemScrollController();
+  List<String>? header;
+  List<List<String>>? content;
 
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    checkPlatformState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(
+        const Duration(seconds: 2),
+        () {
+          header = List.generate(5, (header) => header.toString());
+          content = List.generate(
+            5,
+            (header) => List.generate(
+              20,
+              (content) {
+                return "$header --- Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
+                    "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Amet venenatis ";
+              },
+            ),
+          );
+
+          setState(() {});
+        },
+      );
+    });
   }
 
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    if (Platform.isLinux ||
-        Platform.isMacOS ||
-        Platform.isWindows ||
-        Platform.isFuchsia) {
+  Future<void> checkPlatformState() async {
+    if (Platform.isLinux || Platform.isMacOS || Platform.isWindows || Platform.isFuchsia) {
       throw Exception("Unsupported platforms");
     }
   }
@@ -57,12 +76,14 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Lazy Sticky Headers'),
         ),
         body: LazyStickyHeaders<String, String>(
-          scrollPhysics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics()),
+          scrollPhysics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           scrollController: _itemScrollController,
 
+          // Loader
+          loader: const Center(child: CircularProgressIndicator()),
+
           // Header
-          header: List.generate(5, (header) => header.toString()),
+          header: header,
 
           // Builder header
           builderHeader: (header) {
@@ -82,16 +103,7 @@ class _MyAppState extends State<MyApp> {
           },
 
           // Content
-          content: List.generate(
-            5,
-            (header) => List.generate(
-              20,
-              (content) {
-                return "$header --- Lorem ipsum dolor sit amet, consectetur adipiscing elit, "
-                    "sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Amet venenatis ";
-              },
-            ),
-          ),
+          content: content,
 
           // Builder content
           builderContent: (content) {
